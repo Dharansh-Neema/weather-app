@@ -1,4 +1,4 @@
-const fetch = require("node-fetch");
+const httpRequest = require("../utils/httpRequest");
 exports.home = (req, res) => {
   res.render("home");
 };
@@ -7,52 +7,47 @@ exports.getWeather = async (req, res) => {
   try {
     let { cities } = req.body;
     cities = JSON.stringify(cities);
-    cities = JSON.parse(cities);
-    console.log(cities);
-    cities = Array.from(cities);
-    console.log(cities);
-    let baseUrl = "http://api.weatherapi.com/v1/current.json";
+    let cityArray = [];
 
+    let oneCity = "";
+    for (let i = 0; i < cities.length; i++) {
+      if (cities[i] === '"') {
+        continue;
+      } else if (cities[i].toLowerCase() !== cities[i].toUpperCase()) {
+        oneCity += cities[i];
+      } else if (cities[i] === ",") {
+        cityArray.push(oneCity);
+        oneCity = "";
+      }
+    }
+    let baseUrl = "https://api.weatherapi.com/v1/current.json";
     let response = [];
-    const weather = await fetch(
-      "http://api.weatherapi.com/v1/current.json?key=5db21a198da047cc8f6134827230609&q=banswara&aqi=no"
-    );
-    console.log(weather.body);
-    cities.forEach(async (element) => {
+    const promiseArray = cityArray.map(async (element) => {
       try {
-        element = "mumbai";
-        let res = await fetch(
-          `${baseUrl}?key=${process.env.WEATHERAPI}&q=mumbai&aqi=no`
-        );
-        // console.log(res);
-        // let toAdd = {};
-        // toAdd["name"] = res.location.name;
-        // toAdd.region = res.location.region;
-        // toAdd.temperature = res.current.temp_c;
-        // toAdd.condition = res.condition.text;
-        // toAdd.windSpeed = res.wind_kph;
-        // toAdd.windDirection = res.wind_dir;
-        // toAdd.humidity = res.humidity;
-        // response.push(toAdd);
+        let url = `${baseUrl}?key=${process.env.WEATHERAPI}&q=${element}&aqi=no`;
+        let toAdd = {};
+        const res = await httpRequest(url);
+
+        toAdd.name = res.location.name;
+        toAdd.region = res.location.region;
+        toAdd.temperature = res.current.temp_c;
+        toAdd.condition = res.current.condition.text;
+        toAdd.image = res.current.condition.icon;
+        let toaddString = JSON.stringify(toAdd);
+        let finalObject = JSON.parse(toaddString);
+        return finalObject;
       } catch (error) {
         console.log(error);
-        // res.status(501).json({
-        //   success: false,
-        //   error: error.message,
-        //   message: "Something went wrong while fetching weather",
-        // });
       }
     });
-    res.status(200).json({
-      success: true,
-      response,
-    });
+    const result = await Promise.all(promiseArray);
+    console.log(result);
+    res.status(200).render("weather", { result });
   } catch (error) {
     console.log(error);
     res.status(400).json({
       success: false,
       error: error.message,
-      message: "Something went wrong before making API call",
     });
   }
 };
